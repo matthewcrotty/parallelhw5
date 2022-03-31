@@ -21,19 +21,46 @@ int main(int argc, char** argv){
     int clock_frequency = 512000000;
     double time_in_secs;
 
+    // I hope that this is correct, in order for the largest file to be 32GB,
+    // you need 64 ranks writing 32 blocks of 16M bytes to the file. That means
+    // for the 16M processor block size, you actually need to write
+    // 16M/sizeof(int) integers
+    int block_bytes = atoi(argv[1]);
+    int block_size = block_bytes/sizeof(int);
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    // open
-    // Write block/ranks size 1 to file
-    // close
-    // open
-    // Read block/ranks size 1 from file
-    // close file
+    int* buffer = (int*)malloc(block_size * sizeof(int));
+    int* ones = (int*)malloc(block_size * sizeof(int));
+    for(int i = 0; i < block_size; i++)
+        ones[i] = 1;
 
-    // Is it one file for each rank or one file for each block
-    // Or one file overall?
+
+    MPI_File file;
+    MPI_Status status;
+    int offset;
+
+    start_time = clock_now();
+
+    MPI_File_open(MPI_COMM_SELF, "iotest.txt", MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &file);
+
+    for(int i = 0; i < 32; i++){
+        offset = (block_bytes * world_size * i) + (block_bytes* my_rank);
+        MPI_File_write_at(file, offset, ones, block_size, MPI_INT, &status);
+        MPI_File_read_at(file, offset, buffer, block_size, MPI_INT, &status);
+    }
+
+    MPI_File_close(&file);
+    end_time = clock_now();
+
+    time_in_secs = ((double)(end_time - start_time)) / clock_frequency;
+    printf("Rank %d, Time %f\n", my_rank, time_in_secs);
+
+    free(ones);
+    free(buffer);
+
     MPI_Finalize();
 
 }
