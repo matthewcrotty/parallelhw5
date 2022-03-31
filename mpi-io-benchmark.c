@@ -18,6 +18,7 @@ int main(int argc, char** argv){
 
     unsigned long long start_time;
     unsigned long long end_time;
+    unsigned long long mid_time;
     int clock_frequency = 512000000;
     double time_in_secs;
 
@@ -42,21 +43,27 @@ int main(int argc, char** argv){
     MPI_Status status;
     int offset;
 
-    start_time = clock_now();
+    unsigned long long write_time = 0;
+    unsigned long long read_time = 0;
 
     MPI_File_open(MPI_COMM_SELF, "iotest.txt", MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &file);
 
     for(int i = 0; i < 32; i++){
         offset = (block_bytes * world_size * i) + (block_bytes* my_rank);
+        start_time = clock_now();
         MPI_File_write_at(file, offset, ones, block_size, MPI_INT, &status);
+        mid_time = clock_now();
         MPI_File_read_at(file, offset, buffer, block_size, MPI_INT, &status);
+        end_time = clock_now();
+        write_time += mid_time - start_time;
+        read_time += end_time - mid_time;
     }
 
     MPI_File_close(&file);
-    end_time = clock_now();
 
-    time_in_secs = ((double)(end_time - start_time)) / clock_frequency;
-    printf("Rank %d, Time %f\n", my_rank, time_in_secs);
+
+    time_in_secs = ((double)(write_time)) / clock_frequency;
+    printf("Read time %f Write time %f\n", ((double)(write_time)) / clock_frequency, ((double)(read_time)) / clock_frequency);
 
     free(ones);
     free(buffer);
